@@ -29,8 +29,9 @@ We also prove some basic vector-identities involving of the curl operator.
 - `curl` : The curl operator on functions from `Space 3` to `EuclideanSpace ℝ (Fin 3)`.
 - `distCurl` : The curl operator on distributions from `Space 3` to `EuclideanSpace ℝ (Fin 3)`.
 - `div_of_curl_eq_zero` : The divergence of the curl of a function is zero.
-- `exists_curl_of_div_zero` : A divergence-free `C¹` vector field admits a differentiable
-  vector potential whose curl equals the field.
+- `exists_curl_of_div_zero_contDiff` and `exists_grad_of_curl_zero_contDiff` : For finite or
+  infinite order `n ≥ 1`, a divergence-free `Cⁿ` spatial field admits a `Cⁿ` vector potential,
+  and a curl-free `Cⁿ` spatial field admits a scalar potential of order `n + 1`.
 - `exists_curl_of_div_zero_time_dependent` : For any finite or infinite differentiability order
   `n ≥ 1`, a jointly `Cⁿ` time-dependent vector field that is divergence-free at each time admits
   a vector potential that is jointly `Cⁿ` in time and space.
@@ -544,20 +545,6 @@ lemma eq_neg_curl_of_div_zero (f : Space → EuclideanSpace ℝ (Fin 3)) (hf : C
   · linear_combination (norm := {simp [Fin.sum_univ_three]; ring}) - t ^ 2 * x 1 * hdiv
   · linear_combination (norm := {simp [Fin.sum_univ_three]; ring}) - t ^ 2 * x 2 * hdiv
 
-lemma exists_curl_of_div_zero (f : Space → EuclideanSpace ℝ (Fin 3)) (hf : ContDiff ℝ 1 f)
-    (hdiv : ∇ ⬝ f = 0) :
-    ∃ g : Space → EuclideanSpace ℝ (Fin 3), f = curl g ∧ Differentiable ℝ g := by
-  suffices hneg : ∃ g: Space → EuclideanSpace ℝ (Fin 3), f = - curl g ∧ Differentiable ℝ g by
-    obtain ⟨g, hcurl, hdifferentiable⟩ := hneg
-    use -g
-    subst f
-    simp_all
-    rw [curl_neg]
-    fun_prop
-  use fun x => ∫ (t : ℝ) in 0..1, homotopyOperatorIntegrand f x t ∂(volume)
-  exact ⟨eq_neg_curl_of_div_zero f hf hdiv,
-    fun x => (hasFDerivAt_intervalIntegral_homotopyOperatorIntegrand hf x).differentiableAt⟩
-
 /-- For any finite or infinite differentiability order `n ≥ 1`, a time-dependent
 vector field that is jointly `Cⁿ` in time and space and divergence-free at each
 time admits a jointly `Cⁿ` vector potential whose spatial curl equals the field
@@ -587,6 +574,21 @@ lemma exists_curl_of_div_zero_time_dependent {n : ENat} (hn : 1 ≤ n)
   change f t = curl (-(A t))
   rw [curl_neg (A t) (by fun_prop)]
   exact eq_neg_curl_of_div_zero (f t) (by fun_prop) (hdiv t)
+
+/-- A divergence-free spatial field of finite or infinite order `n ≥ 1` admits a
+`Cⁿ` vector potential. -/
+lemma exists_curl_of_div_zero_contDiff {n : ENat} (hn : 1 ≤ n)
+    (f : Space → EuclideanSpace ℝ (Fin 3)) (hf : ContDiff ℝ n f) (hdiv : div f = 0) :
+    ∃ A : Space → EuclideanSpace ℝ (Fin 3), f = curl A ∧ ContDiff ℝ n A := by
+  obtain ⟨A, hA, hreg⟩ := exists_curl_of_div_zero_time_dependent hn
+    (fun _ => f) (by exact hf.comp contDiff_snd) (fun _ => hdiv)
+  exact ⟨A 0, hA 0, by fun_prop⟩
+
+lemma exists_curl_of_div_zero (f : Space → EuclideanSpace ℝ (Fin 3)) (hf : ContDiff ℝ 1 f)
+    (hdiv : ∇ ⬝ f = 0) :
+    ∃ g : Space → EuclideanSpace ℝ (Fin 3), f = curl g ∧ Differentiable ℝ g := by
+  obtain ⟨A, hcurl, hA⟩ := exists_curl_of_div_zero_contDiff (n := 1) le_rfl f hf hdiv
+  exact ⟨A, hcurl, hA.differentiable one_ne_zero⟩
 
 /-!
 
@@ -728,6 +730,26 @@ lemma exists_grad_of_curl_zero_time_dependent {n : ENat} (hn : 1 ≤ n)
   have hzero (t : Time) : φ t 0 = 0 := by simp [φ]
   refine ⟨φ, fun t => ?_, hφ, hzero⟩
   exact eq_grad_integral_of_curl_zero (f t) (by fun_prop) (hcurl t)
+
+/-- A curl-free spatial field of finite or infinite order `n ≥ 1` admits a scalar potential
+of order `n + 1` that vanishes at the origin. -/
+lemma exists_grad_of_curl_zero_contDiff {n : ENat} (hn : 1 ≤ n)
+    (f : Space → EuclideanSpace ℝ (Fin 3)) (hf : ContDiff ℝ n f) (hcurl : curl f = 0) :
+    ∃ φ : Space → ℝ, f = grad φ ∧ ContDiff ℝ (n + 1) φ ∧ φ 0 = 0 := by
+  have hf₁ : ContDiff ℝ 1 f := hf.of_le (by exact_mod_cast hn)
+  obtain ⟨φ, hgrad, hφ⟩ := exists_grad_of_curl_zero f (hf₁.differentiable one_ne_zero) hcurl
+  have hderiv : fderiv ℝ φ = fun x => toDual ℝ Space (basis.repr.symm (f x)) := by
+    funext x
+    rw [hgrad]
+    exact (hasGradientAt_iff_hasFDerivAt.mp
+      (DifferentiableAt.hasGradientAt_grad x (hφ x))).fderiv
+  have hreg : ContDiff ℝ (n + 1) φ := by
+    apply contDiff_succ_iff_fderiv.mpr
+    refine ⟨hφ, by simp, ?_⟩
+    rw [hderiv]
+    exact (toDual ℝ Space).contDiff.comp (basis.repr.symm.contDiff.comp hf)
+  refine ⟨fun x => φ x + -φ 0, ?_, hreg.add contDiff_const, by simp⟩
+  rw [grad_fun_add_const, hgrad]
 
 /-- Two time-dependent scalar potentials that are spatially differentiable at each time are
 equal if their spatial gradients agree and they agree at the origin at each time. -/
