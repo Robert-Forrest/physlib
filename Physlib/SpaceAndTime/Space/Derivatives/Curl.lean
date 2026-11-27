@@ -40,6 +40,8 @@ We also prove some basic vector-identities involving of the curl operator.
   vanishes at the spatial origin at each time.
 - `eq_of_grad_eq_time_dependent` : Spatial gradients and values at the origin determine a
   time-dependent scalar potential that is differentiable on each time slice.
+- `exists_grad_of_curl_zero_time_dependent_contDiff_slices` : The same normalised potential
+  is jointly `Cⁿ` in time and space and has spatial regularity of order `n + 1` at each time.
 - `distCurl_distGrad_eq_zero` : The curl of the gradient of a distribution is zero.
 - `curl_eq_sum_leviCivitaSymbol` : The components of the curl as a contraction with the
   Levi-Civita symbol.
@@ -761,6 +763,23 @@ lemma eq_of_grad_eq_time_dependent {d : ℕ} {φ ψ : Time → Space d → ℝ}
   intro x
   ext y
   rw [← grad_inner_repr_eq, ← grad_inner_repr_eq, hgrad t]
+
+/-- A jointly `Cⁿ` field that is curl-free at each time admits a normalised, jointly `Cⁿ` scalar
+potential whose spatial slices have differentiability order `n + 1`. -/
+lemma exists_grad_of_curl_zero_time_dependent_contDiff_slices {n : ENat} (hn : 1 ≤ n)
+    (f : Time → Space → EuclideanSpace ℝ (Fin 3)) (hf : ContDiff ℝ n ↿f)
+    (hcurl : ∀ t, curl (f t) = 0) :
+    ∃ φ : Time → Space → ℝ, (∀ t, f t = grad (φ t)) ∧ ContDiff ℝ n ↿φ ∧
+      (∀ t, φ t 0 = 0) ∧ ∀ t, ContDiff ℝ (n + 1) (φ t) := by
+  obtain ⟨φ, hgrad, hφ, hzero⟩ := exists_grad_of_curl_zero_time_dependent hn f hf hcurl
+  refine ⟨φ, hgrad, hφ, hzero, ?_⟩
+  choose ψ hgradψ hψ hzeroψ using fun t =>
+    exists_grad_of_curl_zero_contDiff hn (f t) (by fun_prop) (hcurl t)
+  have hφ₁ : ContDiff ℝ 1 ↿φ := hφ.of_le (by exact_mod_cast hn)
+  have heq : φ = ψ := eq_of_grad_eq_time_dependent (fun t => by fun_prop)
+    (fun t => (hψ t).differentiable (by simp))
+    (fun t => (hgrad t).symm.trans (hgradψ t)) (fun t => (hzero t).trans (hzeroψ t).symm)
+  exact heq.symm ▸ hψ
 
 /-!
 
